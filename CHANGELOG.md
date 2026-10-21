@@ -2,6 +2,11 @@
 
 Status of the `main` branch. Changes prior to the next official version change will appear here.
 
+* General:
+  - Performance: the symbol caches were rewritten in full after every tool call that fetched new symbols,
+    which takes noticeable time for large projects; they are now saved at most every 30 s, and always when
+    language servers are stopped or restarted
+
 # v2.1.0 (2026-10-19)
 
 * General:
