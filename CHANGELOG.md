@@ -2,6 +2,10 @@
 
 Status of the `main` branch. Changes prior to the next official version change will appear here.
 
+* Language Servers:
+  - Fix: a symbol cache file that could not be loaded was overwritten by the next save, losing the whole
+    index; it is now kept next to the cache as `*.bak`
+
 # v2.1.0 (2026-10-19)
 
 * General:
