@@ -1,9 +1,15 @@
+import logging
 import time
 from concurrent.futures import CancelledError
+from queue import Queue
+from unittest.mock import MagicMock
 
 import pytest
 
 from serena.task_executor import TaskExecutor
+from solidlsp.ls_config import LanguageServerId
+from solidlsp.ls_exceptions import SolidLSPException
+from solidlsp.ls_process import StdioLanguageServer
 
 
 @pytest.fixture
@@ -161,3 +167,27 @@ def test_idle_executor_starts_an_issued_task_without_delay(executor):
         delays.append(started_at - issued_at)
 
     assert max(delays) < 0.03
+
+
+def test_timed_out_task_stops_at_its_pending_language_server_request(executor):
+    server = StdioLanguageServer(
+        process_launch_info=MagicMock(),
+        ls_id=LanguageServerId.PYTHON,
+        determine_log_level=lambda _line: logging.INFO,
+    )
+    server._process = MagicMock()
+    outcome: Queue[type[Exception]] = Queue()
+
+    def request_without_response() -> None:
+        try:
+            server.send_request("textDocument/hover", {})
+        except Exception as e:
+            outcome.put(type(e))
+            raise
+
+    future = executor.issue_task(request_without_response, name="blocked")
+    with pytest.raises(TimeoutError):
+        future.result_after_start(timeout=0.3)
+
+    assert outcome.get(timeout=1) is SolidLSPException
+    assert executor.issue_task(lambda: True, name="next").result(timeout=1) is True

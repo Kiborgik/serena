@@ -8,6 +8,8 @@ Status of the `main` branch. Changes prior to the next official version change w
     the call starts
   - Performance: every tool call waited up to 100 ms before it started, because the task queue was polled;
     a call now starts as soon as it is issued
+  - Fix: a tool call that timed out kept sending requests to the language server while the next calls ran;
+    its pending request is now abandoned (and cancelled in the server), and it sends no further requests
 
 # v2.1.0 (2026-10-19)
 

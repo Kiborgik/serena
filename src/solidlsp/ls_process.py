@@ -33,6 +33,7 @@ from solidlsp.lsp_protocol_handler.server import (
     make_response,
 )
 from solidlsp.util import subprocess_util
+from solidlsp.util.cancellation import CancellationToken
 from solidlsp.util.subprocess_util import ManagedSubprocess
 
 log = logging.getLogger(__name__)
@@ -346,7 +347,14 @@ class LanguageServerInterface(ABC):
     def _send_request_once(self, method: str, params: dict | None) -> Request.Result:
         """
         Sends a single request to the server (no retries) and waits for its response.
+
+        A request issued while a cancelled `CancellationToken` is active is not sent. If the active token is
+        cancelled while the request is pending, the request is abandoned (see `_abandon_request`).
         """
+        cancellation_token = CancellationToken.current()
+        if cancellation_token is not None and cancellation_token.is_cancelled():
+            raise SolidLSPException(f"Request {method} was not sent, because the work that issued it was cancelled")
+
         with self._request_id_lock:
             request_id = self.request_id
             self.request_id += 1
@@ -357,12 +365,33 @@ class LanguageServerInterface(ABC):
         with self._response_handlers_lock:
             self._pending_requests[request_id] = request
 
-        self._send_payload(make_request(method, request_id, params))
+        # abandon the request when the work that issued it is cancelled
+        remove_cancellation_callback = (
+            cancellation_token.on_cancel(lambda: self._abandon_request(request_id)) if cancellation_token is not None else None
+        )
+        try:
+            self._send_payload(make_request(method, request_id, params))
 
-        log.debug("Waiting for response to request %s with params:\n%s", method, params)
-        result = request.get_result(timeout=self._request_timeout)
+            log.debug("Waiting for response to request %s with params:\n%s", method, params)
+            result = request.get_result(timeout=self._request_timeout)
+        finally:
+            if remove_cancellation_callback is not None:
+                remove_cancellation_callback()
         log.debug("Completed: %s", request)
         return result
+
+    def _abandon_request(self, request_id: int) -> None:
+        """
+        Abandons a pending request: the request completes with an error, and the server is asked to cancel it.
+
+        :param request_id: the id of the pending request
+        """
+        with self._response_handlers_lock:
+            request = self._pending_requests.pop(request_id, None)
+        if request is None:
+            return
+        self.send_notification("$/cancelRequest", {"id": request_id})
+        request.on_error(SolidLSPException(f"{request} was abandoned, because the work that issued it was cancelled"))
 
     def send_request(self, method: str, params: dict | None = None) -> PayloadLike:
         """

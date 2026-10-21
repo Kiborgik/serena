@@ -12,6 +12,8 @@ from sensai.util import logging
 from sensai.util.logging import LogTime
 from sensai.util.string import ToStringMixin
 
+from solidlsp.util.cancellation import CancellationToken
+
 log = logging.getLogger(__name__)
 T = TypeVar("T")
 
@@ -53,9 +55,19 @@ class TaskExecutor:
             """
             set once the task has been started or cancelled, i.e. once it no longer waits for its turn
             """
+            self._cancellation_token = CancellationToken()
+            """
+            active while the task's function runs; cancelled together with the task, such that language server
+            requests of a cancelled task that is still running are abandoned instead of competing with the next task
+            """
+            self.future.add_done_callback(self._cancel_work_if_cancelled)
 
         def _tostring_includes(self) -> list[str]:
             return ["name"]
+
+        def _cancel_work_if_cancelled(self, future: concurrent.futures.Future) -> None:
+            if future.cancelled():
+                self._cancellation_token.cancel()
 
         def start(self) -> None:
             """
@@ -68,7 +80,7 @@ class TaskExecutor:
                         if self.logged:
                             log.info(f"Task {self.name} was already completed/cancelled; skipping execution")
                         return
-                    with LogTime(self.name, logger=log, enabled=self.logged):
+                    with LogTime(self.name, logger=log, enabled=self.logged), self._cancellation_token.activate():
                         result = self._function()
                         if not self.future.done():
                             self.future.set_result(result)
