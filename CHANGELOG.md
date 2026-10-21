@@ -2,6 +2,11 @@
 
 Status of the `main` branch. Changes prior to the next official version change will appear here.
 
+* Language Servers:
+  - Fix: the first C/C++ (clangd) reference search after a start could return no or incomplete results while
+    clangd was still building its background index; it now waits for the index (at most `indexing_timeout`,
+    default 60 s) instead of a fixed 2 s
+
 # v2.1.0 (2026-10-19)
 
 * General:
