@@ -6,6 +6,8 @@ Status of the `main` branch. Changes prior to the next official version change w
   - Fix: a tool call waiting in the queue behind other calls could time out before it even started,
     because the tool timeout counted from the moment the call was queued; it now counts from the moment
     the call starts
+  - Performance: every tool call waited up to 100 ms before it started, because the task queue was polled;
+    a call now starts as soon as it is issued
 
 # v2.1.0 (2026-10-19)
 

@@ -150,3 +150,14 @@ def test_task_cancelled_in_queue_raises_without_waiting_for_its_turn(executor):
     with pytest.raises(CancelledError):
         future2.result_after_start(timeout=5)
     assert (time.time() - start_time) < 1
+
+
+def test_idle_executor_starts_an_issued_task_without_delay(executor):
+    delays = []
+    for _ in range(10):
+        time.sleep(0.02)
+        issued_at = time.perf_counter()
+        started_at = executor.issue_task(time.perf_counter, name="timestamp").result()
+        delays.append(started_at - issued_at)
+
+    assert max(delays) < 0.03

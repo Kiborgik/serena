@@ -2,7 +2,6 @@
 
 import concurrent.futures
 import threading
-import time
 from collections.abc import Callable
 from concurrent.futures import Future
 from dataclasses import dataclass
@@ -25,6 +24,10 @@ class TaskExecutor:
             (regardless of success, failure, or cancellation)
         """
         self._task_executor_lock = threading.Lock()
+        self._task_executor_queue_changed = threading.Condition(self._task_executor_lock)
+        """
+        notified whenever a task is added to the queue
+        """
         self._task_executor_queue: list[TaskExecutor.Task] = []
         self._task_executor_thread = Thread(target=self._process_task_queue, name=name, daemon=True)
         self._task_executor_thread.start()
@@ -143,14 +146,11 @@ class TaskExecutor:
 
     def _process_task_queue(self) -> None:
         while True:
-            # obtain task from the queue
-            task: TaskExecutor.Task | None = None
-            with self._task_executor_lock:
-                if len(self._task_executor_queue) > 0:
-                    task = self._task_executor_queue.pop(0)
-            if task is None:
-                time.sleep(0.1)
-                continue
+            # obtain the next task from the queue, waiting until one is issued
+            with self._task_executor_queue_changed:
+                while len(self._task_executor_queue) == 0:
+                    self._task_executor_queue_changed.wait()
+                task = self._task_executor_queue.pop(0)
 
             # start task execution asynchronously
             with self._task_executor_lock:
@@ -237,6 +237,7 @@ class TaskExecutor:
                 log.info(f"Scheduling {task_name}")
             task_obj = self.Task(function=task, name=task_name, logged=logged, timeout=timeout)
             self._task_executor_queue.append(task_obj)
+            self._task_executor_queue_changed.notify()
             return task_obj
 
     def execute_task(self, task: Callable[[], T], name: str | None = None, logged: bool = True, timeout: float | None = None) -> T:
