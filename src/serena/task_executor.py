@@ -46,6 +46,10 @@ class TaskExecutor:
             self.logged = logged
             self.timeout = timeout
             self._function = function
+            self._left_queue = threading.Event()
+            """
+            set once the task has been started or cancelled, i.e. once it no longer waits for its turn
+            """
 
         def _tostring_includes(self) -> list[str]:
             return ["name"]
@@ -72,6 +76,7 @@ class TaskExecutor:
 
             thread = Thread(target=run_task, name=self.name)
             thread.start()
+            self._left_queue.set()
 
         def is_done(self) -> bool:
             """
@@ -107,6 +112,19 @@ class TaskExecutor:
             when its result is requested.
             """
             self.future.cancel()
+            self._left_queue.set()
+
+        def result_after_start(self, timeout: float | None = None) -> T:
+            """
+            Blocks until the task is done and returns the result, applying the timeout from the moment the task
+            starts executing rather than from the moment it was queued.
+            If the task is cancelled before it starts, a CancelledError is raised without waiting for its turn.
+
+            :param timeout: the maximum time to wait in seconds once the task has started; if None, wait indefinitely
+            :return: the result of the task
+            """
+            self._left_queue.wait()
+            return self.result(timeout=timeout)
 
         def wait_until_done(self) -> bool:
             """

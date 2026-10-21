@@ -386,12 +386,13 @@ class Tool(Component):
             return result
 
         # execute the tool in the agent's task executor, with timeout
-        # (task timeout bounds task execution in the dispatcher once it runs, result timeout limits the time we wait)
+        # (task timeout bounds task execution in the dispatcher once it runs, result timeout limits the time we wait
+        # once it runs, so that time spent queued behind other tool calls does not count against it)
         tool_call_error: ToolCallError
         timeout = self.agent.serena_config.tool_timeout
         try:
             task_exec = self.agent.issue_task(task, name=self.__class__.__name__, timeout=timeout)
-            return task_exec.result(timeout=timeout)
+            return task_exec.result_after_start(timeout=timeout)
         except ToolCallError as e:
             tool_call_error = e
         except TimeoutError:

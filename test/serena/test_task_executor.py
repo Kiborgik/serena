@@ -1,4 +1,5 @@
 import time
+from concurrent.futures import CancelledError
 
 import pytest
 
@@ -124,3 +125,28 @@ def test_task_executor_cancellation_via_task_info(executor):
         pass
     end_time = time.time()
     assert (end_time - start_time) < 9, "Cancelled task did not stop in time"
+
+
+def test_queued_task_timeout_counts_from_its_start(executor):
+    executor.issue_task(Task(0.7).run, name="task1")
+    future2 = executor.issue_task(Task(0.7).run, name="task2")
+
+    assert future2.result_after_start(timeout=1.0) is True
+
+
+def test_task_running_longer_than_timeout_times_out(executor):
+    future = executor.issue_task(Task(1.0).run, name="task1")
+
+    with pytest.raises(TimeoutError):
+        future.result_after_start(timeout=0.3)
+
+
+def test_task_cancelled_in_queue_raises_without_waiting_for_its_turn(executor):
+    executor.issue_task(Task(3).run, name="task1")
+    future2 = executor.issue_task(Task(1).run, name="task2")
+    future2.cancel()
+
+    start_time = time.time()
+    with pytest.raises(CancelledError):
+        future2.result_after_start(timeout=5)
+    assert (time.time() - start_time) < 1

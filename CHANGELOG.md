@@ -2,6 +2,11 @@
 
 Status of the `main` branch. Changes prior to the next official version change will appear here.
 
+* General:
+  - Fix: a tool call waiting in the queue behind other calls could time out before it even started,
+    because the tool timeout counted from the moment the call was queued; it now counts from the moment
+    the call starts
+
 # v2.1.0 (2026-10-19)
 
 * General:
