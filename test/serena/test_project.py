@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from serena.config.serena_config import ProjectConfig, SerenaConfig
-from serena.project import Project
+from serena.project import Project, find_global_ls_settings_hidden_by_project
 from solidlsp.ls_config import LanguageServerId
 
 
@@ -370,3 +370,20 @@ class TestProjectIgnoreRulesWithGlobalPathsAndGitignore:
         assert project.is_ignored_path(str(self.project_path / "dist" / "bundle.js"))
         # Non-ignored file
         assert not project.is_ignored_path(str(self.project_path / "main.py"))
+
+
+@pytest.mark.parametrize(
+    ("global_settings", "project_settings", "expected"),
+    [
+        (
+            {"cpp": {"ls_path": "/global/clangd", "ls_extra_args": ["-j=6"]}},
+            {"cpp": {"ls_path": "/project/clangd"}},
+            {"cpp": ["ls_extra_args"]},
+        ),
+        ({"cpp": {"ls_extra_args": ["-j=6"]}}, {"cpp": {"ls_extra_args": ["-j=2"]}}, {}),
+        ({"cpp": {"ls_extra_args": ["-j=6"]}}, {"python": {"ls_path": "/project/pyright"}}, {}),
+        ({}, {"cpp": {"ls_path": "/project/clangd"}}, {}),
+    ],
+)
+def test_global_ls_settings_hidden_by_project_settings(global_settings: dict, project_settings: dict, expected: dict) -> None:
+    assert find_global_ls_settings_hidden_by_project(global_settings, project_settings) == expected

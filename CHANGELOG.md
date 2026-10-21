@@ -2,6 +2,10 @@
 
 Status of the `main` branch. Changes prior to the next official version change will appear here.
 
+* General:
+  - Log a warning naming the global `ls_specific_settings` that a project's settings for the same language
+    replace (e.g. global `ls_extra_args` dropped by a project block that only sets `ls_path`)
+
 # v2.1.0 (2026-10-19)
 
 * General:

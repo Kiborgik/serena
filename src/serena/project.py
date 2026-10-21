@@ -31,6 +31,24 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 
+def find_global_ls_settings_hidden_by_project(global_settings: dict, project_settings: dict) -> dict[str, list[str]]:
+    """
+    Finds the global language server-specific settings that do not take effect because the project configuration
+    defines settings for the same language, which replace the global settings for that language as a whole.
+
+    :param global_settings: the global `ls_specific_settings`, mapping language keys to settings
+    :param project_settings: the project's `ls_specific_settings`, mapping language keys to settings
+    :return: a mapping from each affected language key to the sorted global setting keys that do not take effect
+    """
+    hidden_settings: dict[str, list[str]] = {}
+    for language, language_project_settings in project_settings.items():
+        language_global_settings = global_settings.get(language) or {}
+        hidden_keys = sorted(set(language_global_settings) - set(language_project_settings or {}))
+        if hidden_keys:
+            hidden_settings[language] = hidden_keys
+    return hidden_settings
+
+
 class Project(ToStringMixin):
     def __init__(
         self,
@@ -670,6 +688,16 @@ class Project(ToStringMixin):
             ls_specific_settings = dict(self.serena_config.ls_specific_settings)
             if self.project_config.ls_specific_settings:
                 if is_trusted:
+                    hidden_global_settings = find_global_ls_settings_hidden_by_project(
+                        self.serena_config.ls_specific_settings, self.project_config.ls_specific_settings
+                    )
+                    for language, hidden_keys in hidden_global_settings.items():
+                        log.warning(
+                            "The project's ls_specific_settings for '%s' replace the global ones, so these global settings "
+                            "are not used: %s. Repeat them in the project's settings to keep them.",
+                            language,
+                            ", ".join(hidden_keys),
+                        )
                     ls_specific_settings.update(self.project_config.ls_specific_settings)
                 else:
                     log.warning(

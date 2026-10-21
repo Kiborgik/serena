@@ -306,7 +306,8 @@ language server-specific configuration.
 
 You can use the same key in the project configuration files (`project.yml`
 and `project.local.yml` ) to override or extend the global settings for a specific project.
-The settings are merged on top-level, meaning that project-level settings for a language will replace global settings for the same language.  
+The settings are merged on top-level, meaning that project-level settings for a language will replace global settings for the same language.
+Serena logs a warning naming the global settings that a project's settings for a language replace, so repeat the ones you want to keep.  
 Note: Project-level settings are considered only for *trusted projects* (which are defined in the [global configuration](global-config)).
 
 Structure:
