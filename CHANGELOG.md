@@ -31,6 +31,9 @@ Status of the `main` branch. Changes prior to the next official version change w
   - Performance: the symbol caches were rewritten in full after every tool call that fetched new symbols,
     which takes noticeable time for large projects; they are now saved at most every 30 s, and always when
     language servers are stopped or restarted
+  - Fix: a tool call returned its result only after the symbol caches were saved, which takes seconds for large
+    caches and could push the call past the tool timeout (#2211); the caches are now saved after the result is
+    returned
 
 * JetBrains:
   - Fix: When applying a non-symbolic edit, do not raise a post-edit exception during IDE file refresh
